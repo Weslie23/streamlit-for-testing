@@ -1,5 +1,3 @@
-pip install tensorflow 
-
 import streamlit as st
 import tensorflow as tf
 from tensorflow.keras.models import load_model
@@ -8,7 +6,11 @@ import numpy as np
 
 @st.cache_resource
 def load_hand_model():
-    return load_model('hand_classifier.h5')
+    try:
+        return load_model('hand_classifier.h5')
+    except FileNotFoundError:
+        st.error("Error: The 'hand_classifier.h5' model file was not found. Please make sure it is in the same directory as this script.")
+        return None
 
 model = load_hand_model()
 
@@ -23,16 +25,28 @@ def import_and_predict(image_data, model):
     image = image.convert("RGB")
     img = np.asarray(image)
     img_reshape = img[np.newaxis, ...] / 255.0
-    prediction = model.predict(img_reshape)
-    return prediction
+    try:
+        prediction = model.predict(img_reshape)
+        return prediction
+    except Exception as e:
+        st.error(f"Error during prediction: {e}")
+        return None
 
-if file is None:
-    st.text("Please upload an image file.")
+if model is not None:
+    if file is None:
+        st.text("Please upload an image file.")
+    else:
+        try:
+            image = Image.open(file)
+            st.image(image, use_column_width=True)
+            prediction = import_and_predict(image, model)
+
+            if prediction is not None:
+                class_names = ['improper', 'proper']
+                result = class_names[np.argmax(prediction)]
+                confidence = prediction[0][np.argmax(prediction)] * 100
+                st.success(f"Prediction: **{result.title()}** (Confidence: {confidence:.2f}%)")
+        except Exception as e:
+            st.error(f"Error processing the image: {e}")
 else:
-    image = Image.open(file)
-    st.image(image, use_column_width=True)
-    prediction = import_and_predict(image, model)
-    class_names = ['improper', 'proper']
-    result = class_names[np.argmax(prediction)]
-    confidence = prediction[0][np.argmax(prediction)] * 100
-    st.success(f"Prediction: **{result.title()}** (Confidence: {confidence:.2f}%)")
+    st.warning("The hand classification model could not be loaded. Please ensure 'hand_classifier.h5' is in the correct location.")
